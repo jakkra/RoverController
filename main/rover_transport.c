@@ -52,11 +52,20 @@ void rover_transport_start(void)
     
 }
 
-esp_err_t rover_transport_send(uint8_t buf, uint16_t len)
+esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
 {
     esp_err_t res = ESP_FAIL;
     if (esp_websocket_client_is_connected(client)) {
-        res = (esp_err_t)esp_websocket_client_send_bin(client, (char*)buf, len, pdMS_TO_TICKS(1000));
+        uint32_t len_sent = esp_websocket_client_send_bin(client, (char*)buf, len, pdMS_TO_TICKS(1000));
+        ESP_LOGW(TAG, "Length sent: %d", len_sent);
+        if (len_sent > 0) {
+            if (len_sent != len) {
+                ESP_LOGE(TAG, "Need logic to handle partial writes");
+            }
+            res = ESP_OK;
+        }
+    } else {
+        ESP_LOGE(TAG, "Rover Not Connected");
     }
 
     return res;

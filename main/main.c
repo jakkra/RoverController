@@ -12,6 +12,8 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "rover_transport.h"
+#include "controller_input.h"
+#include "rover_controller.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -91,4 +93,6 @@ void app_main(void)
     rover_transport_init();
     webserver_init();
 
+    rover_controller_init();
+    
 }
