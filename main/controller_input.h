@@ -5,23 +5,40 @@
 #include "esp_adc_cal.h"
 #include "soc/adc_channel.h"
 
-typedef struct adc_sample_t {
-    adc1_channel_t  channel;
+typedef struct controller_sample_t {
     uint32_t        raw_value;
     uint32_t        voltage;
-} adc_sample_t;
+} controller_sample_t;
 
 typedef enum inputs {
-    INPUT_LEFT_JOYSTICK,
-    INPUT_RIGHT_JOYSTICK,
-    INPUT_LEFT_JOYSTICK_BUTTON,
-    INPUT_RIGHT_JOYSTICK_BUTTON,
-    INPOUT_SWITCH_ROVER_MODE,
-    INPOUT_SWITCH_ARM_MODE,
+    INPUT_LEFT_JOYSTICK_X,
+    INPUT_LEFT_JOYSTICK_Y,
+    INPUT_LEFT_JOYSTICK_ROTATE,
+    INPUT_RIGHT_JOYSTICK_X,
+    INPUT_RIGHT_JOYSTICK_Y,
+    INPUT_RIGHT_JOYSTICK_ROTATE,
+#ifdef HAVE_PINS_37_38
+    INPUT_POT_LEFT,
+    INPUT_POT_RIGHT,
+#endif
+    INPUT_ANALOG_END,
+    INPUT_SWITCH_1_UP = INPUT_ANALOG_END,
+    INPUT_SWITCH_1_DOWN,
+    INPUT_SWITCH_2_UP,
+    INPUT_SWITCH_2_DOWN,
+    INPUT_SWITCH_3_UP,
+    INPUT_SWITCH_3_DOWN,
+    INPUT_SWITCH_4_UP,
+    INPUT_SWITCH_4_DOWN,
+    INPUT_SWITCH_5_UP,
+    INPUT_SWITCH_5_DOWN,
+    INPUT_SWITCH_6_UP,
+    INPUT_SWITCH_6_DOWN,
+    INPUTS_END
 } inputs;
 
-typedef void adc_callback(adc_sample_t* samples, uint8_t num_samples);
+typedef void samples_callback(controller_sample_t* samples, uint8_t num_samples);
 
-void controller_input_init(adc1_channel_t* channels, uint8_t num, uint16_t time_between_samples_ms, adc_callback* callback);
+void controller_input_init(uint16_t time_between_samples_ms, samples_callback* callback);
 uint32_t controller_input_get_map(uint8_t id, uint32_t min, uint32_t max);
 

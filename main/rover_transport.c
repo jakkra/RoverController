@@ -55,17 +55,15 @@ void rover_transport_start(void)
 esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
 {
     esp_err_t res = ESP_FAIL;
-    if (esp_websocket_client_is_connected(client)) {
+    if (esp_websocket_client_is_connected(client) && rover_connected) {
         uint32_t len_sent = esp_websocket_client_send_bin(client, (char*)buf, len, pdMS_TO_TICKS(1000));
-        ESP_LOGW(TAG, "Length sent: %d", len_sent);
+        //ESP_LOGW(TAG, "Length sent: %d", len_sent);
         if (len_sent > 0) {
             if (len_sent != len) {
                 ESP_LOGE(TAG, "Need logic to handle partial writes");
             }
             res = ESP_OK;
         }
-    } else {
-        ESP_LOGE(TAG, "Rover Not Connected");
     }
 
     return res;
@@ -81,6 +79,7 @@ static void ws_timed_out(void* arg)
 }
 
 static void restart_communication_timer(void) {
+    rover_connected = true;
     esp_timer_stop(ws_timeout_timer);
     ESP_ERROR_CHECK(esp_timer_start_once(ws_timeout_timer, WS_TIMEOUT_MS * 1000));
 }
@@ -150,7 +149,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             ESP_LOGW(TAG, "WIFI_EVENT_AP_STACONNECTED");
             wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
             if (!check_rover_connected()) {
-                if (xSemaphoreTake(connect_semaphore, pdMS_TO_TICKS(1))) {
+                if (xSemaphoreTake(connect_semaphore, pdMS_TO_TICKS(5))) {
                     assert(connect_task_handle == NULL);
                     BaseType_t status = xTaskCreate(try_connect_rover_websocket, "try_connect_rover_websocket", 2048, NULL, tskIDLE_PRIORITY, &connect_task_handle);
                     assert(status == pdPASS);
@@ -173,5 +172,5 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
 
 static bool check_rover_connected(void)
 {
-    return esp_websocket_client_is_connected(client);
+    return esp_websocket_client_is_connected(client) || rover_connected;
 }
