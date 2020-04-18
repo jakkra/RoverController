@@ -11,6 +11,8 @@
 #include "esp_event.h"
 #include "esp_wifi.h"
 
+#include "rover_telematics.h"
+
 #include "config.h"
 
 #define WS_TIMEOUT_MS 1500
@@ -18,16 +20,15 @@
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static bool check_rover_connected(void);
-static void try_connect_rover_websocket(void* params);
+static void try_connect_rover_websocket(void);
 static void ws_timed_out(void* arg);
-
+static void async_ws_connect(void);
 
 
 static const char *TAG = "ROVER_TRANSPORT";
 
 static bool rover_connected = false;
-static esp_websocket_client_handle_t client;
-static TaskHandle_t connect_task_handle = NULL;
+static esp_websocket_client_handle_t client = NULL;
 static xSemaphoreHandle connect_semaphore;
 static esp_timer_handle_t ws_timeout_timer;
 
@@ -49,7 +50,14 @@ void rover_transport_init(void)
 
 void rover_transport_start(void)
 {
-    
+    esp_websocket_client_config_t websocket_cfg = {};
+    websocket_cfg.uri = ROVER_WS_URL;
+    websocket_cfg.disable_auto_reconnect = true;
+
+    ESP_LOGI(TAG, "Connecting to %s...", websocket_cfg.uri);
+
+    client = esp_websocket_client_init(&websocket_cfg);
+    ESP_ERROR_CHECK(esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client));
 }
 
 esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
@@ -74,8 +82,8 @@ static void ws_timed_out(void* arg)
     ESP_LOGE(TAG, "WS timeout Rover lost");
     rover_connected = false;
     esp_websocket_client_stop(client);
-    esp_websocket_client_destroy(client);
-    client = NULL;
+    //esp_websocket_client_destroy(client);
+    //client = NULL;
 }
 
 static void restart_communication_timer(void) {
@@ -90,16 +98,33 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGW(TAG, "WEBSOCKET_EVENT_CONNECTED");
+        xSemaphoreGive(connect_semaphore);
         restart_communication_timer();
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "WEBSOCKET_EVENT_DISCONNECTED");
-        client = NULL;
+        if (!rover_connected) {
+            ESP_LOGW(TAG, "Not Rover");
+            xSemaphoreGive(connect_semaphore);
+        }
+
+        if (rover_connected) {
+            rover_connected = false;
+            wifi_sta_list_t sta_list;
+            if (esp_wifi_ap_get_sta_list(&sta_list) == ESP_OK) {
+                if (sta_list.num > 0) {
+                    async_ws_connect();
+                }
+            }
+        };
         break;
     case WEBSOCKET_EVENT_DATA:
         restart_communication_timer();
-        //ESP_LOGW(TAG, "WEBSOCKET_EVENT_DATA");
-        //ESP_LOGW(TAG, "Received opcode=%d", data->op_code);
+        if (data->data_len != data->payload_len) {
+            ESP_LOGE(TAG, "Need to implement segmented websocket data!");
+        } else {
+            rover_telematics_put(data->data_ptr, data->data_len);
+        }
         break;
     case WEBSOCKET_EVENT_ERROR:
         ESP_LOGW(TAG, "WEBSOCKET_EVENT_ERROR");
@@ -107,38 +132,6 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
     default: 
         break;
     }
-}
-
-static void try_connect_rover_websocket(void* params)
-{
-    vTaskDelay(pdMS_TO_TICKS(100));
-    esp_websocket_client_config_t websocket_cfg = {};
-    websocket_cfg.uri = ROVER_WS_URL;
-
-    ESP_LOGI(TAG, "Connecting to %s...", websocket_cfg.uri);
-
-    client = esp_websocket_client_init(&websocket_cfg);
-    esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client);
-
-    esp_websocket_client_start(client);
-    for (uint16_t i = 0; i < 10; i++) {
-        if (esp_websocket_client_is_connected(client)) {
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-    if (!esp_websocket_client_is_connected(client)) {
-        ESP_LOGW(TAG, "Not rover");
-        esp_websocket_client_stop(client);
-        esp_websocket_client_destroy(client);
-        client = NULL;
-    } else {
-        ESP_LOGI(TAG, "Found Rover, ws connected");
-        rover_connected = true;
-    }
-    connect_task_handle = NULL;
-    xSemaphoreGive(connect_semaphore);
-    vTaskDelete(NULL);
 }
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -149,16 +142,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             ESP_LOGW(TAG, "WIFI_EVENT_AP_STACONNECTED");
             wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
             if (!check_rover_connected()) {
-                if (xSemaphoreTake(connect_semaphore, pdMS_TO_TICKS(5))) {
-                    assert(connect_task_handle == NULL);
-                    BaseType_t status = xTaskCreate(try_connect_rover_websocket, "try_connect_rover_websocket", 2048, NULL, tskIDLE_PRIORITY, &connect_task_handle);
-                    assert(status == pdPASS);
-                    if (status != pdPASS) {
-                        xSemaphoreGive(connect_semaphore);
-                    }
-                } else {
-                    ESP_LOGE(TAG, "Failed getting connect semaphore, connect already in progress");
-                }
+                async_ws_connect();
             }
             break;
         }
@@ -167,6 +151,20 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
             ESP_LOGW(TAG, "WIFI_EVENT_AP_STADISCONNECTED");
             break;
         }
+    }
+}
+
+static void async_ws_connect(void)
+{
+    if (xSemaphoreTake(connect_semaphore, 0)) {
+        ESP_LOGI(TAG, "Try connect to Rover");
+        //ESP_ERROR_CHECK(esp_websocket_client_start(client));
+        if (esp_websocket_client_start(client) != ESP_OK) {
+            ESP_LOGE(TAG, "esp_websocket_client_start failed");
+        }
+        
+    } else {
+        ESP_LOGE(TAG, "Failed getting connect semaphore, connect already in progress");
     }
 }
 

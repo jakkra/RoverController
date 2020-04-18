@@ -49,9 +49,9 @@ static void periodic_send_data(void* params)
         assert(notification == ADC_DATA_NOTIFICATION);
         assert(xSemaphoreTake(sem_handle, portMAX_DELAY) == pdPASS);
         for (uint8_t i = 0; i < INPUT_ANALOG_END; i++) {
-            printf("%d: Raw: %d, %dmV  ", i, controller_samples[i].raw_value, controller_samples[i].voltage);
+            //printf("%d: Raw: %d, %dmV  ", i, controller_samples[i].raw_value, controller_samples[i].voltage);
         }
-        printf("\n");
+        //printf("\n");
         build_rover_payload();
         xSemaphoreGive(sem_handle);
         rover_transport_send((uint8_t*)tx_buf, tx_buf_payload_len);
@@ -64,8 +64,8 @@ static void build_rover_payload(void)
 
     tx_buf[0] = map(controller_samples[INPUT_RIGHT_JOYSTICK_X].raw_value, 0, 1023, 1000, 2000);
     tx_buf[1] = map(controller_samples[INPUT_RIGHT_JOYSTICK_Y].raw_value, 0, 1023, 1000, 2000);
-    tx_buf[2] = 1500;
-    tx_buf[3] = 1500;
+    tx_buf[2] = map(controller_samples[INPUT_LEFT_JOYSTICK_X].raw_value, 0, 1023, 1000, 2000);
+    tx_buf[3] = map(controller_samples[INPUT_LEFT_JOYSTICK_Y].raw_value, 0, 1023, 1000, 2000);
     tx_buf[4] = 1000;
     tx_buf[5] = 1500;
     //ESP_LOGW(TAG, "Send: %d, %d \t %d, %d \t %d, %d\n", tx_buf[0], tx_buf[1], tx_buf[2],  tx_buf[3], tx_buf[4], tx_buf[5]);

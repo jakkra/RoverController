@@ -89,10 +89,11 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    start_ap();
-    rover_transport_init();
     webserver_init();
-
+    rover_transport_init();
     rover_controller_init();
+    rover_transport_start();
+
+    start_ap();
     
 }
