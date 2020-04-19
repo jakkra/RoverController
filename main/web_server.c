@@ -15,7 +15,8 @@
 
 #include "config.h"
 
-#define ROVER_WS_SSL
+// Browsers don't like unsecure websockets
+//#define ROVER_WS_SSL
 
 #define MAX_WS_INCOMING_SIZE    100
 #define WS_CONNECT_MESSAGE      "CONNECT"
@@ -240,30 +241,10 @@ static void ws_async_send(void *arg)
     }
 }
 
-typedef struct GyroAccelData
-{
-  float temp;
-  float accX;
-  float accY;
-  float accZ;
-  float gyroX;
-  float gyroY;
-  float gyroZ;
-  float gyroAngleX;
-  float gyroAngleY;
-  float gyroAngleZ;
-  float angleX;
-  float angleY;
-  float angleZ;
-} GyroAccelData;
-
 static void on_telematics_data(uint8_t* telemetics, uint16_t length)
 {
     assert(length <= TX_BUF_SIZE);
-
-    GyroAccelData* data  = (GyroAccelData*) telemetics;
-    ESP_LOGI("", "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f",  data->temp, data->accX, data->accY, data->accZ, data->gyroX, data->gyroY, data->gyroZ, data->gyroAngleX, data->gyroAngleY, data->gyroAngleZ, data->angleX, data->angleY, data->angleZ);
-    
+        
     if (!any_client_connected()) {
         return;
     }

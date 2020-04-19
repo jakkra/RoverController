@@ -20,9 +20,9 @@
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static bool check_rover_connected(void);
-static void try_connect_rover_websocket(void);
 static void ws_timed_out(void* arg);
 static void async_ws_connect(void);
+static void handle_rover_connection(void* args);
 
 
 static const char *TAG = "ROVER_TRANSPORT";
@@ -46,6 +46,9 @@ void rover_transport_init(void)
     
     ESP_ERROR_CHECK(esp_timer_create(&oneshot_timer_args, &ws_timeout_timer));
 
+    TaskHandle_t task_handle;
+    BaseType_t status = xTaskCreate(handle_rover_connection, "connect_rover", 4096, NULL, tskIDLE_PRIORITY, &task_handle);
+    assert(status = pdPASS);
 }
 
 void rover_transport_start(void)
@@ -53,8 +56,6 @@ void rover_transport_start(void)
     esp_websocket_client_config_t websocket_cfg = {};
     websocket_cfg.uri = ROVER_WS_URL;
     websocket_cfg.disable_auto_reconnect = true;
-
-    ESP_LOGI(TAG, "Connecting to %s...", websocket_cfg.uri);
 
     client = esp_websocket_client_init(&websocket_cfg);
     ESP_ERROR_CHECK(esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client));
@@ -65,7 +66,6 @@ esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
     esp_err_t res = ESP_FAIL;
     if (esp_websocket_client_is_connected(client) && rover_connected) {
         uint32_t len_sent = esp_websocket_client_send_bin(client, (char*)buf, len, pdMS_TO_TICKS(1000));
-        //ESP_LOGW(TAG, "Length sent: %d", len_sent);
         if (len_sent > 0) {
             if (len_sent != len) {
                 ESP_LOGE(TAG, "Need logic to handle partial writes");
@@ -77,13 +77,27 @@ esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
     return res;
 }
 
+static void handle_rover_connection(void* args)
+{
+    while (true) {
+        if (!rover_connected && xQueuePeek((xQueueHandle)connect_semaphore, NULL, 0) == pdTRUE) {
+            wifi_sta_list_t sta_list;
+            if (esp_wifi_ap_get_sta_list(&sta_list) == ESP_OK) {
+                if (sta_list.num > 0) {
+                    async_ws_connect();
+                }
+            }
+        };
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+
 static void ws_timed_out(void* arg)
 {
-    ESP_LOGE(TAG, "WS timeout Rover lost");
+    ESP_LOGE(TAG, "WS Timeout Rover lost");
     rover_connected = false;
     esp_websocket_client_stop(client);
-    //esp_websocket_client_destroy(client);
-    //client = NULL;
 }
 
 static void restart_communication_timer(void) {
@@ -98,30 +112,21 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
     switch (event_id) {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGW(TAG, "WEBSOCKET_EVENT_CONNECTED");
+        rover_connected = true;
         xSemaphoreGive(connect_semaphore);
         restart_communication_timer();
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "WEBSOCKET_EVENT_DISCONNECTED");
         if (!rover_connected) {
-            ESP_LOGW(TAG, "Not Rover");
+            ESP_LOGD(TAG, "Not Rover");
             xSemaphoreGive(connect_semaphore);
         }
-
-        if (rover_connected) {
-            rover_connected = false;
-            wifi_sta_list_t sta_list;
-            if (esp_wifi_ap_get_sta_list(&sta_list) == ESP_OK) {
-                if (sta_list.num > 0) {
-                    async_ws_connect();
-                }
-            }
-        };
         break;
     case WEBSOCKET_EVENT_DATA:
         restart_communication_timer();
         if (data->data_len != data->payload_len) {
-            ESP_LOGE(TAG, "Need to implement segmented websocket data!");
+            ESP_LOGE(TAG, "Need to implement segmented websocket data => discarding");
         } else {
             rover_telematics_put(data->data_ptr, data->data_len);
         }
@@ -157,10 +162,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
 static void async_ws_connect(void)
 {
     if (xSemaphoreTake(connect_semaphore, 0)) {
-        ESP_LOGI(TAG, "Try connect to Rover");
-        //ESP_ERROR_CHECK(esp_websocket_client_start(client));
+        ESP_LOGD(TAG, "Try connect to Rover");
         if (esp_websocket_client_start(client) != ESP_OK) {
-            ESP_LOGE(TAG, "esp_websocket_client_start failed");
+            ESP_LOGD(TAG, "esp_websocket_client_start failed");
+            xSemaphoreGive(connect_semaphore);
         }
         
     } else {
@@ -170,5 +175,5 @@ static void async_ws_connect(void)
 
 static bool check_rover_connected(void)
 {
-    return esp_websocket_client_is_connected(client) || rover_connected;
+    return /*esp_websocket_client_is_connected(client) ||*/ rover_connected;
 }
