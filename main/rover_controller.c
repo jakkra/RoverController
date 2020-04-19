@@ -17,7 +17,7 @@
 
 static void sample_readings_done_callback(controller_sample_t* samples, uint8_t num_samples);
 static void periodic_send_data(void* params);
-static void build_rover_payload(void);
+static bool build_rover_payload(void);
 
 
 static const char* TAG = "ROVER_CONTROLLER";
@@ -52,23 +52,36 @@ static void periodic_send_data(void* params)
             //printf("%d: Raw: %d, %dmV  ", i, controller_samples[i].raw_value, controller_samples[i].voltage);
         }
         //printf("\n");
-        build_rover_payload();
+        bool payload_changed = build_rover_payload();
         xSemaphoreGive(sem_handle);
-        rover_transport_send((uint8_t*)tx_buf, tx_buf_payload_len);
+        if (payload_changed) {
+            rover_transport_send((uint8_t*)tx_buf, tx_buf_payload_len);
+        }
     }
 }
 
-static void build_rover_payload(void)
+static bool build_rover_payload(void)
 {
+    bool payload_changed = true;
+    uint16_t temp_tx_buf[MAX_TX_BUF_LEN];
+
     tx_buf_payload_len = 6 * sizeof(uint16_t); // Rover RC controller have 6 channels, limit to that for now for compatability
 
-    tx_buf[0] = map(controller_samples[INPUT_RIGHT_JOYSTICK_X].raw_value, 0, 1023, 1000, 2000);
-    tx_buf[1] = map(controller_samples[INPUT_RIGHT_JOYSTICK_Y].raw_value, 0, 1023, 1000, 2000);
-    tx_buf[2] = map(controller_samples[INPUT_LEFT_JOYSTICK_X].raw_value, 0, 1023, 1000, 2000);
-    tx_buf[3] = map(controller_samples[INPUT_LEFT_JOYSTICK_Y].raw_value, 0, 1023, 1000, 2000);
-    tx_buf[4] = 1000;
-    tx_buf[5] = 1500;
+    temp_tx_buf[0] = map(controller_samples[INPUT_RIGHT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000);
+    temp_tx_buf[1] = map(controller_samples[INPUT_RIGHT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
+    temp_tx_buf[2] = map(controller_samples[INPUT_LEFT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000);
+    temp_tx_buf[3] = map(controller_samples[INPUT_LEFT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
+    temp_tx_buf[4] = 1000;
+    temp_tx_buf[5] = 1500;
+
+    TODO("Could do more here, like only send if something changed more than x")
+    if (memcmp(temp_tx_buf, tx_buf, tx_buf_payload_len) == 0) {
+        payload_changed = false;
+    } else {
+        memcpy(tx_buf, temp_tx_buf, tx_buf_payload_len);
+    }
     //ESP_LOGW(TAG, "Send: %d, %d \t %d, %d \t %d, %d\n", tx_buf[0], tx_buf[1], tx_buf[2],  tx_buf[3], tx_buf[4], tx_buf[5]);
+    return payload_changed;
 }
 
 static void sample_readings_done_callback(controller_sample_t* samples, uint8_t num_samples)
