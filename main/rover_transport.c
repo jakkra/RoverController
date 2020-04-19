@@ -80,7 +80,7 @@ esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
 static void handle_rover_connection(void* args)
 {
     while (true) {
-        if (!rover_connected && xQueuePeek((xQueueHandle)connect_semaphore, NULL, 0) == pdTRUE) {
+        if (!rover_connected/* && xQueuePeek((xQueueHandle)connect_semaphore, NULL, 0) == pdTRUE*/) {
             wifi_sta_list_t sta_list;
             if (esp_wifi_ap_get_sta_list(&sta_list) == ESP_OK) {
                 if (sta_list.num > 0) {
@@ -167,7 +167,6 @@ static void async_ws_connect(void)
             ESP_LOGD(TAG, "esp_websocket_client_start failed");
             xSemaphoreGive(connect_semaphore);
         }
-        
     } else {
         ESP_LOGE(TAG, "Failed getting connect semaphore, connect already in progress");
     }

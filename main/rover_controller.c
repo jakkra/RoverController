@@ -18,6 +18,7 @@
 static void sample_readings_done_callback(controller_sample_t* samples, uint8_t num_samples);
 static void periodic_send_data(void* params);
 static bool build_rover_payload(void);
+static uint16_t convert_3_way_switch(uint32_t raw1, uint32_t raw2);
 
 
 static const char* TAG = "ROVER_CONTROLLER";
@@ -48,7 +49,7 @@ static void periodic_send_data(void* params)
         assert(xTaskNotifyWait(ADC_DATA_NOTIFICATION, 0, &notification, portMAX_DELAY));
         assert(notification == ADC_DATA_NOTIFICATION);
         assert(xSemaphoreTake(sem_handle, portMAX_DELAY) == pdPASS);
-        for (uint8_t i = 0; i < INPUT_ANALOG_END; i++) {
+        for (uint8_t i = 0; i < INPUTS_END; i++) {
             //printf("%d: Raw: %d, %dmV  ", i, controller_samples[i].raw_value, controller_samples[i].voltage);
         }
         //printf("\n");
@@ -71,10 +72,10 @@ static bool build_rover_payload(void)
     temp_tx_buf[1] = map(controller_samples[INPUT_RIGHT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
     temp_tx_buf[2] = map(controller_samples[INPUT_LEFT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000);
     temp_tx_buf[3] = map(controller_samples[INPUT_LEFT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
-    temp_tx_buf[4] = 1000;
+    temp_tx_buf[4] = convert_3_way_switch(controller_samples[INPUT_SWITCH_1_UP].raw_value, controller_samples[INPUT_SWITCH_1_DOWN].raw_value);
     temp_tx_buf[5] = 1500;
 
-    TODO("Could do more here, like only send if something changed more than x")
+    //TODO("Could do more here, like only send if something changed more than x")
     if (memcmp(temp_tx_buf, tx_buf, tx_buf_payload_len) == 0) {
         payload_changed = false;
     } else {
@@ -97,3 +98,17 @@ static void sample_readings_done_callback(controller_sample_t* samples, uint8_t 
     assert(xTaskNotify(task_handle, ADC_DATA_NOTIFICATION, eSetValueWithOverwrite) == pdPASS);
 }
 
+static uint16_t convert_3_way_switch(uint32_t up, uint32_t down)
+{
+    uint16_t value;
+
+    if (up == 0 && down == 0) {
+        value = 1500;
+    } else if (up == 1) {
+        value = 1000;
+    } else {
+        value = 2000;
+    }
+
+    return value;
+} 

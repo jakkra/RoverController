@@ -8,12 +8,14 @@
 #include "esp_adc_cal.h"
 #include "soc/adc_channel.h"
 #include "rover_utils.h"
+#include "esp_log.h"
 
 #define DEFAULT_VREF    1100
 #define NO_OF_SAMPLES   32
 
 #define ATTENUATION     ADC_ATTEN_DB_11
 #define ADC_WIDTH       ADC_WIDTH_BIT_10
+
 
 static uint16_t rover_channel_map[INPUTS_END] = {
     INPUT_LEFT_JOYSTICK_X,
@@ -52,8 +54,8 @@ static uint16_t rover_pin_map[INPUTS_END] = {
     [INPUT_POT_LEFT] = ADC1_GPIO38_CHANNEL, // TODO Special and not availible on dev board
     [INPUT_POT_RIGHT] = ADC1_GPIO37_CHANNEL, // TODO Special and not availible on dev board
 #endif
-    [INPUT_SWITCH_1_UP] = GPIO_NUM_15,
-    [INPUT_SWITCH_1_DOWN] = GPIO_NUM_2,
+    [INPUT_SWITCH_1_UP] = GPIO_NUM_26,
+    [INPUT_SWITCH_1_DOWN] = GPIO_NUM_25,
     [INPUT_SWITCH_2_UP] = GPIO_NUM_4,
     [INPUT_SWITCH_2_DOWN] = GPIO_NUM_5,
     [INPUT_SWITCH_3_UP] = GPIO_NUM_18,
@@ -70,7 +72,7 @@ static uint16_t rover_pin_map[INPUTS_END] = {
 static void print_char_val_type(esp_adc_cal_value_t val_type);
 static void sample_task(void* params);
 
-static controller_sample_t samples[INPUT_ANALOG_END];
+static controller_sample_t samples[INPUTS_END];
 static esp_adc_cal_characteristics_t* adc_chars;
 static uint16_t sleep_time;
 static samples_callback* on_sample_done_callback;
@@ -99,7 +101,7 @@ void controller_input_init(uint16_t time_between_samples_ms, samples_callback* c
     }
 
     TaskHandle_t handle;
-    BaseType_t status = xTaskCreate(sample_task, "gpio_sample_task", 2048, NULL, tskIDLE_PRIORITY, &handle);
+    BaseType_t status = xTaskCreate(sample_task, "gpio_sample_task", 4096, NULL, tskIDLE_PRIORITY, &handle);
     assert(status == pdPASS);
 }
 
@@ -140,10 +142,9 @@ static void sample_task(void* params)
             samples[i].raw_value = adc_reading;
             samples[i].voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
         }
-
         for (uint8_t i = INPUT_ANALOG_END; i < INPUTS_END; i++) {
-            //samples[i].raw_value = gpio_get_level((gpio_num_t)rover_pin_map[i]);
-            //samples[i].voltage = samples[i].raw_value == 0 ? 0 : 3300;
+            samples[i].raw_value = gpio_get_level((gpio_num_t)rover_pin_map[i]);
+            samples[i].voltage = samples[i].raw_value == 0 ? 0 : 3300;
         }
 
         on_sample_done_callback(samples, INPUTS_END);
