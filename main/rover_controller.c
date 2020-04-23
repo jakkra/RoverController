@@ -6,7 +6,8 @@
 
 #include "rover_controller.h"
 #include "controller_input.h"
-#include "rover_transport.h"
+#include "transport_ws.h"
+#include "transport_lora.h"
 #include "rover_utils.h"
 #include "config.h"
 
@@ -19,6 +20,7 @@ static void sample_readings_done_callback(controller_sample_t* samples, uint8_t 
 static void periodic_send_data(void* params);
 static bool build_rover_payload(void);
 static uint16_t convert_3_way_switch(uint32_t raw1, uint32_t raw2);
+static bool should_use_wifi_transport(void);
 
 
 static const char* TAG = "ROVER_CONTROLLER";
@@ -50,13 +52,17 @@ static void periodic_send_data(void* params)
         assert(notification == ADC_DATA_NOTIFICATION);
         assert(xSemaphoreTake(sem_handle, portMAX_DELAY) == pdPASS);
         for (uint8_t i = 0; i < INPUTS_END; i++) {
-            //printf("%d: Raw: %d, %dmV  ", i, controller_samples[i].raw_value, controller_samples[i].voltage);
+            printf("%d: Raw: %d  ", i, controller_samples[i].raw_value);
         }
-        //printf("\n");
+        printf("\n");
         bool payload_changed = build_rover_payload();
         xSemaphoreGive(sem_handle);
         if (payload_changed) {
-            rover_transport_send((uint8_t*)tx_buf, tx_buf_payload_len);
+            if (should_use_wifi_transport()) {
+                transport_ws_send((uint8_t*)tx_buf, tx_buf_payload_len);
+            } else {
+                transport_lora_send((uint8_t*)tx_buf, tx_buf_payload_len);
+            }
         }
     }
 }
@@ -81,7 +87,7 @@ static bool build_rover_payload(void)
     } else {
         memcpy(tx_buf, temp_tx_buf, tx_buf_payload_len);
     }
-    //ESP_LOGW(TAG, "Send: %d, %d \t %d, %d \t %d, %d\n", tx_buf[0], tx_buf[1], tx_buf[2],  tx_buf[3], tx_buf[4], tx_buf[5]);
+    //ESP_LOGW(TAG, "Send: %d, %d \t %d, %d \t %d, %d", tx_buf[0], tx_buf[1], tx_buf[2],  tx_buf[3], tx_buf[4], tx_buf[5]);
     return payload_changed;
 }
 
@@ -112,3 +118,8 @@ static uint16_t convert_3_way_switch(uint32_t up, uint32_t down)
 
     return value;
 } 
+
+static bool should_use_wifi_transport(void)
+{
+    return convert_3_way_switch(controller_samples[INPUT_SWITCH_2_UP].raw_value, controller_samples[INPUT_SWITCH_2_DOWN].raw_value) == 2000;
+}

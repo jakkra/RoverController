@@ -32,8 +32,6 @@ typedef enum inputs {
     INPUT_SWITCH_4_DOWN,
     INPUT_SWITCH_5_UP,
     INPUT_SWITCH_5_DOWN,
-    INPUT_SWITCH_6_UP,
-    INPUT_SWITCH_6_DOWN,
     INPUTS_END
 } inputs;
 

@@ -3,7 +3,7 @@
 #define AP_SSID                             "RoverController"
 #define AP_PASS                             ""
 
-#define ROVER_WS_URL                        "ws://192.168.4.5:81"
+#define ROVER_WS_URL                        "ws://192.168.4.5:80/ws"
 
 // TODO could use mdns instead of hardcoding
 #define ROVER_CONTROLLER_STATIC_IP          "192.168.4.1"

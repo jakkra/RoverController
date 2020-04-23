@@ -11,7 +11,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "rover_transport.h"
+#include "transport_ws.h"
 #include "controller_input.h"
 #include "rover_controller.h"
 
@@ -20,6 +20,7 @@
 
 #include "web_server.h"
 #include "config.h"
+#include "transport_lora.h"
 
 static const char *TAG = "main";
 
@@ -89,11 +90,11 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    transport_lora_init();
     webserver_init();
-    rover_transport_init();
+    transport_ws_init();
     rover_controller_init();
-    rover_transport_start();
-
-    start_ap();
+    transport_ws_start();
     
+    start_ap();
 }

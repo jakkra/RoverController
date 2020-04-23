@@ -10,6 +10,7 @@
 #include "esp_websocket_client.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
+#include "transport_ws.h"
 
 #include "rover_telematics.h"
 
@@ -25,14 +26,14 @@ static void async_ws_connect(void);
 static void handle_rover_connection(void* args);
 
 
-static const char *TAG = "ROVER_TRANSPORT";
+static const char *TAG = "TRANSPORT_WS";
 
 static bool rover_connected = false;
 static esp_websocket_client_handle_t client = NULL;
 static xSemaphoreHandle connect_semaphore;
 static esp_timer_handle_t ws_timeout_timer;
 
-void rover_transport_init(void)
+void transport_ws_init(void)
 {
     connect_semaphore = xSemaphoreCreateBinary();
     assert(connect_semaphore != NULL);
@@ -51,7 +52,7 @@ void rover_transport_init(void)
     assert(status = pdPASS);
 }
 
-void rover_transport_start(void)
+void transport_ws_start(void)
 {
     esp_websocket_client_config_t websocket_cfg = {};
     websocket_cfg.uri = ROVER_WS_URL;
@@ -61,7 +62,7 @@ void rover_transport_start(void)
     ESP_ERROR_CHECK(esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client));
 }
 
-esp_err_t rover_transport_send(uint8_t* buf, uint16_t len)
+esp_err_t transport_ws_send(uint8_t* buf, uint16_t len)
 {
     esp_err_t res = ESP_FAIL;
     if (esp_websocket_client_is_connected(client) && rover_connected) {
