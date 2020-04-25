@@ -2,12 +2,22 @@
 #include "lora.h"
 #include "transport_lora.h"
 #include "esp_log.h"
+#include "esp_err.h"
+#include "assert.h"
 
 static const char* TAG = "TRANSPORT_WS";
 
+static bool lora_modem_detected = false;
+
 void transport_lora_init(void)
 {
-   lora_init();
+   if (lora_init() == ESP_OK) {
+      lora_modem_detected = true;
+   } else {
+      lora_modem_detected = false;
+      ESP_LOGE(TAG, "No LoRa modem detected");
+      return;
+   }
    lora_set_frequency(868e6);
    lora_enable_crc();
    lora_set_spreading_factor(6);
@@ -21,5 +31,7 @@ void transport_lora_init(void)
 
 void transport_lora_send(uint8_t* data, uint16_t length)
 {
-   lora_send_packet(data, length);
+   if (lora_modem_detected) {
+      lora_send_packet(data, length);
+   }
 }

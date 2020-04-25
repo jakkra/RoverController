@@ -11,7 +11,7 @@
 #include "rover_utils.h"
 #include "config.h"
 
-#define ADC_SAMPLE_DELAY        50
+#define ADC_SAMPLE_DELAY        25
 #define MAX_TX_BUF_LEN          100
 
 #define ADC_DATA_NOTIFICATION   1
@@ -52,9 +52,9 @@ static void periodic_send_data(void* params)
         assert(notification == ADC_DATA_NOTIFICATION);
         assert(xSemaphoreTake(sem_handle, portMAX_DELAY) == pdPASS);
         for (uint8_t i = 0; i < INPUTS_END; i++) {
-            printf("%d: Raw: %d  ", i, controller_samples[i].raw_value);
+            //printf("%d: Raw: %d  ", i, controller_samples[i].raw_value);
         }
-        printf("\n");
+        //printf("\n");
         bool payload_changed = build_rover_payload();
         xSemaphoreGive(sem_handle);
         if (payload_changed) {

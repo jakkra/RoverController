@@ -362,8 +362,12 @@ lora_init(void)
       if(version == 0x12) break;
       vTaskDelay(2);
    }
+   printf("LORA_VER: %d\n", version);
+   if (version == 0) {
+      return -1;
+   }
    assert(i <= TIMEOUT_RESET + 1); // at the end of the loop above, the max value i can reach is TIMEOUT_RESET + 1
-
+   
    /*
     * Default configuration.
     */
@@ -375,7 +379,7 @@ lora_init(void)
    lora_set_tx_power(17);
 
    lora_idle();
-   return 1;
+   return ESP_OK;
 }
 
 /**
