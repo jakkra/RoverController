@@ -12,3 +12,6 @@
 
 #define ROVER_CONTROLLER_MIN_TX_VALUE       1000
 #define ROVER_CONTROLLER_MAX_TX_VALUE       2000
+
+#define ROVER_CONTROLLER_SDA                GPIO_NUM_22
+#define ROVER_CONTROLLER_SCL                GPIO_NUM_23

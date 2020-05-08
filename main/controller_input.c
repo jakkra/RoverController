@@ -4,17 +4,21 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "driver/i2c.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "soc/adc_channel.h"
 #include "rover_utils.h"
 #include "esp_log.h"
+#include "ads1115.h"
 
 #define DEFAULT_VREF    1100
 #define NO_OF_SAMPLES   32
 
 #define ATTENUATION     ADC_ATTEN_DB_11
 #define ADC_WIDTH       ADC_WIDTH_BIT_10
+
+#define I2C_NUM         I2C_NUM_0
 
 
 static uint16_t rover_channel_map[INPUTS_END] = {
@@ -24,10 +28,8 @@ static uint16_t rover_channel_map[INPUTS_END] = {
     INPUT_RIGHT_JOYSTICK_X,
     INPUT_RIGHT_JOYSTICK_Y,
     INPUT_RIGHT_JOYSTICK_ROTATE,
-#ifdef HAVE_PINS_37_38
     INPUT_POT_LEFT,
     INPUT_POT_RIGHT,
-#endif
     INPUT_SWITCH_1_UP,
     INPUT_SWITCH_1_DOWN,
     INPUT_SWITCH_2_UP,
@@ -48,10 +50,8 @@ static uint16_t rover_pin_map[INPUTS_END] = {
     [INPUT_RIGHT_JOYSTICK_X] = ADC1_GPIO34_CHANNEL,
     [INPUT_RIGHT_JOYSTICK_Y] = ADC1_GPIO35_CHANNEL,
     [INPUT_RIGHT_JOYSTICK_ROTATE] = ADC1_GPIO32_CHANNEL,
-#ifdef HAVE_PINS_37_38
-    [INPUT_POT_LEFT] = ADC1_GPIO38_CHANNEL, // TODO Special and not availible on dev board
-    [INPUT_POT_RIGHT] = ADC1_GPIO37_CHANNEL, // TODO Special and not availible on dev board
-#endif
+    [INPUT_POT_LEFT] = ADS1115_MUX_0_GND,
+    [INPUT_POT_RIGHT] = ADS1115_MUX_1_GND,
     [INPUT_SWITCH_1_UP] = GPIO_NUM_25,
     [INPUT_SWITCH_1_DOWN] = GPIO_NUM_13,
     [INPUT_SWITCH_2_UP] = GPIO_NUM_17,
@@ -72,6 +72,7 @@ static controller_sample_t samples[INPUTS_END];
 static esp_adc_cal_characteristics_t* adc_chars;
 static uint16_t sleep_time;
 static samples_callback* on_sample_done_callback;
+static ads1115_t ads;
 
 void controller_input_init(uint16_t time_between_samples_ms, samples_callback* callback)
 {
@@ -90,11 +91,25 @@ void controller_input_init(uint16_t time_between_samples_ms, samples_callback* c
         adc1_config_channel_atten((adc1_channel_t)rover_pin_map[i], ATTENUATION);
     }
 
-    for (uint8_t i = INPUT_ANALOG_END; i < INPUTS_END; i++) {
+    for (uint8_t i = INPUT_ANALOG_I2C_END; i < INPUTS_END; i++) {
         gpio_pad_select_gpio((gpio_num_t)rover_pin_map[i]);
         gpio_set_direction((gpio_num_t)rover_pin_map[i], GPIO_MODE_INPUT);
         gpio_set_pull_mode((gpio_num_t)rover_pin_map[i], GPIO_PULLDOWN_ONLY);
     }
+
+    ESP_ERROR_CHECK(i2c_driver_install(I2C_NUM, I2C_MODE_MASTER, 0, 0, 0));
+    ESP_ERROR_CHECK(i2c_set_pin(I2C_NUM, ROVER_CONTROLLER_SDA, ROVER_CONTROLLER_SCL, true, true, I2C_MODE_MASTER));
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = GPIO_NUM_22,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = GPIO_NUM_23,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 100000
+    };
+    ESP_ERROR_CHECK(i2c_param_config(I2C_NUM, &conf));
+
+    ads = ads1115_config(I2C_NUM, 0x48);
 
     TaskHandle_t handle;
     BaseType_t status = xTaskCreate(sample_task, "gpio_sample_task", 4096, NULL, tskIDLE_PRIORITY, &handle);
@@ -138,7 +153,14 @@ static void sample_task(void* params)
             samples[i].raw_value = adc_reading;
             samples[i].voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
         }
-        for (uint8_t i = INPUT_ANALOG_END; i < INPUTS_END; i++) {
+
+        for (uint8_t i = INPUT_ANALOG_END; i < INPUT_ANALOG_I2C_END; i++) {
+            ads1115_set_mux(&ads, rover_pin_map[i]);
+            samples[i].raw_value = ads1115_get_raw(&ads);
+            samples[i].voltage = ads1115_get_voltage_from_raw(&ads, samples[i].raw_value) * 1000;
+        }
+
+        for (uint8_t i = INPUT_ANALOG_I2C_END; i < INPUTS_END; i++) {
             samples[i].raw_value = gpio_get_level((gpio_num_t)rover_pin_map[i]);
             samples[i].voltage = samples[i].raw_value == 0 ? 0 : 3300;
         }
