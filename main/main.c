@@ -14,6 +14,7 @@
 #include "transport_ws.h"
 #include "controller_input.h"
 #include "rover_controller.h"
+#include "leds.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -90,6 +91,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    leds_init();
     transport_lora_init();
     webserver_init();
     transport_ws_init();

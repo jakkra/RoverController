@@ -12,6 +12,7 @@
 #include "esp_timer.h"
 
 #include "rover_telematics.h"
+#include "leds.h"
 
 #include "config.h"
 
@@ -73,6 +74,7 @@ void webserver_init(void)
     server.tx_sem = xSemaphoreCreateBinary();
     assert(server.tx_sem != NULL);
     xSemaphoreGive(server.tx_sem);
+    
 
     rover_telematics_register_on_data(&on_telematics_data);
 }
@@ -248,7 +250,7 @@ static void on_telematics_data(uint8_t* telemetics, uint16_t length)
     if (!any_client_connected()) {
         return;
     }
-
+    
     if (xSemaphoreTake(server.tx_sem, 0) == pdPASS) {
         memcpy(server.tx_buf, telemetics, length);
         server.tx_buf_len = length;
