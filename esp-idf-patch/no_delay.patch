@@ -1,0 +1,14 @@
+diff --git a/components/tcp_transport/transport_tcp.c b/components/tcp_transport/transport_tcp.c
+index 5bfb99ddf..542e62d6f 100644
+--- a/components/tcp_transport/transport_tcp.c
++++ b/components/tcp_transport/transport_tcp.c
+@@ -79,6 +79,9 @@ static int tcp_connect(esp_transport_handle_t t, const char *host, int port, int
+     setsockopt(tcp->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+     setsockopt(tcp->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+ 
++    int flag = 1; // Minimizes TCP delay. Makes pretty big difference.
++    setsockopt(tcp->sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
++    
+     ESP_LOGD(TAG, "[sock=%d],connecting to server IP:%s,Port:%d...",
+              tcp->sock, ipaddr_ntoa((const ip_addr_t*)&remote_ip.sin_addr.s_addr), port);
+     if (connect(tcp->sock, (struct sockaddr *)(&remote_ip), sizeof(struct sockaddr)) != 0) {
