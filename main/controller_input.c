@@ -20,6 +20,8 @@
 
 #define I2C_NUM         I2C_NUM_0
 
+#define LAST_SWITCH     INPUT_SWITCH_3_UP
+
 
 static uint16_t rover_channel_map[INPUTS_END] = {
     INPUT_LEFT_JOYSTICK_X,
@@ -91,7 +93,7 @@ void controller_input_init(uint16_t time_between_samples_ms, samples_callback* c
         adc1_config_channel_atten((adc1_channel_t)rover_pin_map[i], ATTENUATION);
     }
 
-    for (uint8_t i = INPUT_ANALOG_I2C_END; i < INPUTS_END; i++) {
+    for (uint8_t i = INPUT_ANALOG_I2C_END; i < LAST_SWITCH; i++) {
         gpio_pad_select_gpio((gpio_num_t)rover_pin_map[i]);
         gpio_set_direction((gpio_num_t)rover_pin_map[i], GPIO_MODE_INPUT);
         gpio_set_pull_mode((gpio_num_t)rover_pin_map[i], GPIO_PULLDOWN_ONLY);
@@ -110,6 +112,7 @@ void controller_input_init(uint16_t time_between_samples_ms, samples_callback* c
     ESP_ERROR_CHECK(i2c_param_config(I2C_NUM, &conf));
 
     ads = ads1115_config(I2C_NUM, 0x48);
+    ads1115_set_sps(&ads, ADS1115_SPS_860);
 
     TaskHandle_t handle;
     BaseType_t status = xTaskCreate(sample_task, "gpio_sample_task", 4096, NULL, tskIDLE_PRIORITY, &handle);
@@ -155,12 +158,13 @@ static void sample_task(void* params)
         }
 
         for (uint8_t i = INPUT_ANALOG_END; i < INPUT_ANALOG_I2C_END; i++) {
-            ads1115_set_mux(&ads, rover_pin_map[i]);
-            samples[i].raw_value = ads1115_get_raw(&ads);
-            samples[i].voltage = ads1115_get_voltage_from_raw(&ads, samples[i].raw_value) * 1000;
+            // Not used right now so skip
+            //ads1115_set_mux(&ads, rover_pin_map[i]);
+            //samples[i].raw_value = ads1115_get_raw(&ads);
+            //samples[i].voltage = ads1115_get_voltage_from_raw(&ads, samples[i].raw_value) * 1000;
         }
 
-        for (uint8_t i = INPUT_ANALOG_I2C_END; i < INPUTS_END; i++) {
+        for (uint8_t i = INPUT_ANALOG_I2C_END; i < LAST_SWITCH; i++) {
             samples[i].raw_value = gpio_get_level((gpio_num_t)rover_pin_map[i]);
             samples[i].voltage = samples[i].raw_value == 0 ? 0 : 3300;
         }

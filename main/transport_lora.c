@@ -1,11 +1,13 @@
 #include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lora.h"
 #include "transport_lora.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "assert.h"
 
-static const char* TAG = "TRANSPORT_WS";
+static const char* TAG = "TRANSPORT_LORA";
 
 static bool lora_modem_detected = false;
 

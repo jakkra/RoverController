@@ -16,5 +16,5 @@
 #define ROVER_CONTROLLER_SDA                GPIO_NUM_22
 #define ROVER_CONTROLLER_SCL                GPIO_NUM_23
 
-#define LED_RIGHT_GPIO                      GPIO_NUM_16
-#define LED_LEFT_GPIO                       GPIO_NUM_18
+#define LED_RIGHT_GPIO                      GPIO_NUM_15
+#define LED_LEFT_GPIO                       GPIO_NUM_12
