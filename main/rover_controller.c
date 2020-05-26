@@ -6,7 +6,7 @@
 
 #include "rover_controller.h"
 #include "controller_input.h"
-#include "transport_ws.h"
+#include "transport_wifi.h"
 #include "transport_lora.h"
 #include "rover_utils.h"
 #include "config.h"

@@ -10,7 +10,12 @@
 #include "esp_websocket_client.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
-#include "transport_ws.h"
+#include "transport_wifi.h"
+
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include <lwip/netdb.h>
 
 #include "rover_telematics.h"
 
@@ -18,12 +23,15 @@
 
 #define WS_TIMEOUT_MS 1500
 
+#define PORT 8080
+
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 static bool check_rover_connected(void);
 static void ws_timed_out(void* arg);
 static void async_ws_connect(void);
 static void handle_rover_connection(void* args);
+static void udp_server_task(void *args);
 
 
 static const char *TAG = "TRANSPORT_WS";
@@ -49,7 +57,10 @@ void transport_ws_init(void)
 
     TaskHandle_t task_handle;
     BaseType_t status = xTaskCreate(handle_rover_connection, "connect_rover", 4096, NULL, tskIDLE_PRIORITY, &task_handle);
-    assert(status = pdPASS);
+    assert(status == pdPASS);
+
+    status = xTaskCreate(udp_server_task, "udp_server", 4096, (void*)AF_INET, 5, NULL);
+    assert(status == pdPASS);
 }
 
 void transport_ws_start(void)
@@ -126,7 +137,7 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
         break;
     case WEBSOCKET_EVENT_DATA:
         restart_communication_timer();
-        if (data->data_len != data->payload_len) {
+        if (data->data_len != data->payload_len && data->data_len > 1) {
             ESP_LOGE(TAG, "Need to implement segmented websocket data => discarding");
         } else {
             rover_telematics_put(data->data_ptr, data->data_len);
@@ -176,4 +187,63 @@ static void async_ws_connect(void)
 static bool check_rover_connected(void)
 {
     return /*esp_websocket_client_is_connected(client) ||*/ rover_connected;
+}
+
+static void udp_server_task(void *pvParameters)
+{
+    uint8_t rx_buffer[128];
+    char addr_str[128];
+    int ip_protocol = 0;
+    struct sockaddr_in6 dest_addr;
+
+    while (true) {
+
+        struct sockaddr_in *dest_addr_ip4 = (struct sockaddr_in *)&dest_addr;
+        dest_addr_ip4->sin_addr.s_addr = htonl(INADDR_ANY);
+        dest_addr_ip4->sin_family = AF_INET;
+        dest_addr_ip4->sin_port = htons(PORT);
+        ip_protocol = IPPROTO_IP;
+        
+
+        int sock = socket(AF_INET, SOCK_DGRAM, ip_protocol);
+        if (sock < 0) {
+            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            break;
+        }
+        ESP_LOGI(TAG, "Socket created");
+
+        int err = bind(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        if (err < 0) {
+            ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+        }
+        ESP_LOGI(TAG, "Socket bound, port %d", PORT);
+
+        while (1) {
+            memset(rx_buffer, 0, sizeof(rx_buffer));
+            struct sockaddr_in6 source_addr;
+            socklen_t socklen = sizeof(source_addr);
+            int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
+
+            if (len < 0) {
+                ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
+                break;
+            }
+            else {
+                inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+                if (rx_buffer[0] == '[' && rx_buffer[len - 1] == ']') {
+                    printf("got data");
+                    rover_telematics_put(&rx_buffer[1], len - 2);
+                } else {
+                    ESP_LOGI(TAG, "start: %c, end: %c", rx_buffer[0], rx_buffer[len - 1]);
+                }
+            }
+        }
+
+        if (sock != -1) {
+            ESP_LOGE(TAG, "Shutting down socket and restarting...");
+            shutdown(sock, 0);
+            close(sock);
+        }
+    }
+    vTaskDelete(NULL);
 }

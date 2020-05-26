@@ -11,7 +11,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "transport_ws.h"
+#include "transport_wifi.h"
 #include "controller_input.h"
 #include "rover_controller.h"
 #include "leds.h"
