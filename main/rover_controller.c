@@ -11,7 +11,7 @@
 #include "rover_utils.h"
 #include "config.h"
 
-#define ADC_SAMPLE_DELAY        50
+#define ADC_SAMPLE_DELAY        100
 #define MAX_TX_BUF_LEN          100
 
 #define ADC_DATA_NOTIFICATION   1

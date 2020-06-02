@@ -250,6 +250,8 @@ static void on_telematics_data(uint8_t* telemetics, uint16_t length)
     if (!any_client_connected()) {
         return;
     }
+
+    
     
     if (xSemaphoreTake(server.tx_sem, 0) == pdPASS) {
         memcpy(server.tx_buf, telemetics, length);

@@ -428,7 +428,7 @@ lora_receive_packet(uint8_t *buf, int size)
    int irq = lora_read_reg(REG_IRQ_FLAGS);
    lora_write_reg(REG_IRQ_FLAGS, irq);
    if((irq & IRQ_RX_DONE_MASK) == 0) return 0;
-   if(irq & IRQ_PAYLOAD_CRC_ERROR_MASK) return 0;
+   if(irq & IRQ_PAYLOAD_CRC_ERROR_MASK) return -1;
 
    /*
     * Find packet size.

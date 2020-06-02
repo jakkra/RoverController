@@ -231,7 +231,6 @@ static void udp_server_task(void *pvParameters)
             else {
                 inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
                 if (rx_buffer[0] == '[' && rx_buffer[len - 1] == ']') {
-                    printf("got data");
                     rover_telematics_put(&rx_buffer[1], len - 2);
                 } else {
                     ESP_LOGI(TAG, "start: %c, end: %c", rx_buffer[0], rx_buffer[len - 1]);
