@@ -74,12 +74,13 @@ static bool build_rover_payload(void)
 
     tx_buf_payload_len = 6 * sizeof(uint16_t); // Rover RC controller have 6 channels, limit to that for now for compatability
 
-    temp_tx_buf[0] = map(controller_samples[INPUT_RIGHT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000);
+    temp_tx_buf[0] = 2000 + 1000 - map(controller_samples[INPUT_RIGHT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000); // Steer joystick is inverted
     temp_tx_buf[1] = map(controller_samples[INPUT_RIGHT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
     temp_tx_buf[2] = map(controller_samples[INPUT_LEFT_JOYSTICK_X].voltage, 0, 3300, 1000, 2000);
     temp_tx_buf[3] = map(controller_samples[INPUT_LEFT_JOYSTICK_Y].voltage, 0, 3300, 1000, 2000);
     temp_tx_buf[4] = convert_3_way_switch(controller_samples[INPUT_SWITCH_1_UP].raw_value, controller_samples[INPUT_SWITCH_1_DOWN].raw_value);
     temp_tx_buf[5] = 1500;
+
 
     //TODO("Could do more here, like only send if something changed more than x")
     if (memcmp(temp_tx_buf, tx_buf, tx_buf_payload_len) == 0) {
