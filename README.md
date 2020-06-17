@@ -4,9 +4,9 @@ Webpage for viewing telematics graphs on phone [https://github.com/jakkra/Rover-
 
 ## How it works
 Sets up an AP, the Rover will automatically connect if it's in range.
-The Rover is controlled by sending joystick and switch state over either LoRa or a websocket. If the Rover isn't connected to the AP, then data will be sent over LoRa instead. There is a switch to override this behaviour and always send data ove LoRa even if th Rover is connected to the AP.
+The Rover is controlled by sending joystick and switch state over either LoRa or a websocket. If the Rover isn't connected to the AP, then data will be sent over LoRa instead. There is a switch to override this behaviour and always send data over LoRa even if the Rover is connected to the AP.
 
-When the rover is connected to the local AP it will send telematics data over the websocket, which then in turn is passed on to a phone if one is connected. This bridging is necessary as I plan to also send the telematics from the Rover using LoRa in the future to allow telematics when Rover is far away.
+When the Rover is connected to the local AP it will send telematics data over the websocket, or over LoRa if the Rover is outside of WiFi range. The data is then in turn passed on to a phone if one is connected. When the Rover is close by telematics will arrive about 10/s over WiFi, if outide of range then telematics are transported over LoRa. As LoRa modules cannot do true duplex data transfer we need to switch between sending and receiving, meaning telematics sent by the rover while we are sending joystick data will be lost. From experimentation LoRa telematics arrive about every 500ms. 
 
 A phone can connect to the Controller AP to view the telematics from the Rover. Phone opens a websocket connection to the Controller and receives the telematic data the Rover sends. Telematics website can be found here: https://github.com/jakkra/Rover-Mission-Control.
 
@@ -25,6 +25,7 @@ Full Fusion 360 project is found in `CAD` folder.
 For pinmapping see: https://github.com/jakkra/RoverController/blob/master/main/controller_input.c#L46
 
 ## Images
+<img src="/.github/contoller_rover.jpg "/>
 <img src="/.github/controller.jpg "/>
 <img src="/.github/interface.jpg "/>
 <img src="/.github/render.png "/>
