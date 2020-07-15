@@ -15,7 +15,7 @@ Full Fusion 360 project is found in `CAD` folder.
 
 ## Hardware
 - [ESP32 + LoRa module](https://www.banggood.com/2Pcs-LILYGO-TTGO-LORA32-868Mhz-ESP32-LoRa-OLED-0_96-Inch-Blue-Display-bluetooth-WIFI-ESP-32-Development-Board-Module-With-Antenna-p-1507044.html?rmmds=myorder&cur_warehouse=CN)
-- 2x [Joysticks](https://www.ebay.com/itm/4-Axis-Joystick-Potentiometer-Button-For-JH-D400X-R4-10K-4D-with-Wire/313002251456?ssPageName=STRK%3AMEBIDX%3AIT&_trksid=p2057872.m2749.l2649)
+- 2x [Joysticks](https://www.ebay.com/sch/i.html?_from=R40&_trksid=m570.l1313&_nkw=JH-D400X-R4-10K-4D&_sacat=0)
 - 1x ADS1115 (ESP32 does not have enough ADCs for all the pots)
 - A few on-off-on switches
 - 2 potentiometers
